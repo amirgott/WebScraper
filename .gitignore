@@ -1,0 +1,15 @@
+
+*.idea/workspace.xml
+*.idea/tasks.xml
+*.idea/dictionaries/
+*.idea/misc.xml
+*.idea/modules.xml
+*.idea/localHistory/
+*.idea/caches/
+*.idea/index/
+*.idea/runConfigurations/
+*.idea/watcherTasks.xml
+*.idea/vcs.xml
+*.idea/libraries/
+*.idea/usage.statistics.xml
+*.idea/feature.usage.statistics.xml

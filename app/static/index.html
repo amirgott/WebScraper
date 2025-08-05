@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Scraper App</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for better aesthetics and responsiveness */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 12px; /* Rounded corners */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08); /* Soft shadow */
+        }
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            color: #374151;
+            background-color: #f9fafb;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #6366f1; /* Focus color */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Focus shadow */
+        }
+        textarea {
+            min-height: 120px; /* Minimum height for prompt and result textareas */
+            resize: vertical; /* Allow vertical resizing */
+        }
+        button {
+            background-color: #6366f1; /* Primary button color */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3); /* Button shadow */
+        }
+        button:hover {
+            background-color: #4f46e5; /* Darker on hover */
+            transform: translateY(-1px); /* Slight lift on hover */
+        }
+        button:active {
+            transform: translateY(0); /* Press effect */
+        }
+        #resultDisplay {
+            min-height: 200px;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            border-radius: 8px;
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-break: break-word; /* Break long words */
+            font-size: 0.95rem;
+            color: #4b5563;
+        }
+        /* Loading spinner styles */
+        .loading-spinner {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #6366f1; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Web Scraper</h1>
+
+        <div class="mb-6">
+            <label for="urlInput" class="mb-2">URL to Scrape:</label>
+            <input type="text" id="urlInput" placeholder="e.g., https://www.example.com" class="mb-4">
+        </div>
+
+        <div class="flex items-center justify-center mb-8">
+            <button id="scrapeButton" class="mr-4">Scrape Page</button>
+            <div id="loadingSpinner" class="loading-spinner"></div>
+        </div>
+
+        <div>
+            <label for="resultDisplay" class="mb-2">Scraped Result:</label>
+            <textarea id="resultDisplay" readonly class="bg-gray-50"></textarea>
+        </div>
+
+        <div class="flex items-center justify-center mt-6">
+            <button id="confirmButton" class="hidden bg-green-500 hover:bg-green-600 active:bg-green-700"
+            disabled>Confirm</button>
+        </div>
+    </div>
+
+    <script>
+        // Get references to the HTML elements
+        const urlInput = document.getElementById('urlInput');
+        const scrapeButton = document.getElementById('scrapeButton');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const confirmButton = document.getElementById('confirmButton'); // Reference to the confirm button
+
+        let url; // Declare url in the shared scope
+
+        // Add an event listener to the scrape button
+        scrapeButton.addEventListener('click', async () => {
+            url = urlInput.value.trim();
+
+            // Basic validation for the URL input
+            if (!url) {
+                resultDisplay.value = 'Please enter a URL to scrape.';
+                return;
+            }
+
+            // Show loading message and spinner, disable button
+            resultDisplay.value = 'Scraping in progress... This may take a moment.';
+            loadingSpinner.style.display = 'block'; // Show spinner
+            scrapeButton.disabled = true; // Disable button to prevent multiple clicks
+            confirmButton.disabled = true; // Ensure "Confirm" stays disabled during scraping
+            confirmButton.classList.add('hidden'); // Hide the button while scraping
+
+            try {
+                // Define the backend URL. If running locally, it's typically http://localhost:5000/scrape
+                const backendUrl = 'http://localhost:5000/scrape';
+
+                // Make a POST request to the backend with the URL
+                const response = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url }), // Send data as JSON
+                });
+
+                const data = await response.json(); // Parse the JSON response from the backend
+
+                if (response.ok) {
+                    const resultData = data.result; // This is the object received from the backend
+
+                    // Format the object into readable text
+                    const formattedResult = Object.entries(resultData)
+                        .map(([key, value]) => `${key}: ${value || 'N/A'}`)
+                        .join('\n'); // Join lines with newlines
+
+                    resultDisplay.value = formattedResult || 'No content extracted or result is empty.';
+
+                    // Enable and show the confirm button
+                    confirmButton.disabled = false;
+                    confirmButton.classList.remove('hidden');
+                } else {
+                    resultDisplay.value = `Error: ${data.error || 'Unknown error occurred.'}`;
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                resultDisplay.value = `Failed to connect to the backend or an unexpected error occurred: ${error.message}`;
+            } finally {
+                // Always hide the spinner and re-enable the scrape button, regardless of success or failure
+                loadingSpinner.style.display = 'none';
+                scrapeButton.disabled = false;
+            }
+        });
+
+        // Add an event listener to the confirm button
+        confirmButton.addEventListener('click', async () => {
+            try {
+                const confirmUrl = `http://localhost:5000/confirm?url=${url}`;
+
+                const response = await fetch(confirmUrl, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    alert('Confirmation received successfully!');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Confirmation failed: ${errorData.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Confirm error:', error);
+                alert('An error occurred when confirming.');
+            }
+        });
+    </script>
+</body>
+</html>
