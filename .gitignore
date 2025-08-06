@@ -1,4 +1,5 @@
 
+# IntelliJ IDEA files and directories
 *.idea/workspace.xml
 *.idea/tasks.xml
 *.idea/dictionaries/
@@ -13,3 +14,45 @@
 *.idea/libraries/
 *.idea/usage.statistics.xml
 *.idea/feature.usage.statistics.xml
+*.idea/shelf/
+*.idea/httpRequests/
+*.idea/dataSources/
+*.idea/dataSources.local.xml
+
+# IntelliJ IDEA module files
+*.iml
+
+# Python related
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+.env
+
+# Logs
+logs/
+*.log
+
+# OS specific files
+.DS_Store
+Thumbs.db

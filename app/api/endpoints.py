@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Dict, Any
 
 from app.core.dependencies import get_llm_service, get_scraper_service, get_google_sheets_service
-from app.core.services import LLMService, ScraperService, GoogleSheetsService
+from app.core.services import BaseLLMService, BaseScraperService, GoogleSheetsService
 
 router = APIRouter()
 
@@ -46,8 +46,8 @@ class ProcessedDataPayload(BaseModel):
 @router.post("/scrape")
 async def scrape_and_process(
         payload: URLPayload,
-        scraper: ScraperService = Depends(get_scraper_service),
-        llm: LLMService = Depends(get_llm_service)
+        scraper: BaseScraperService = Depends(get_scraper_service),
+        llm: BaseLLMService = Depends(get_llm_service)
 ):
     """
     Scrapes a URL and processes the content with an LLM.
@@ -94,7 +94,7 @@ async def confirm_data(url: str, gsheets=Depends(get_google_sheets_service)):
 @router.post("/improve")
 async def improve_data(
         payload: ProcessedDataPayload,
-        llm: LLMService = Depends(get_llm_service)
+        llm: BaseLLMService = Depends(get_llm_service)
 ):
     """
     Triggers a re-processing of the data (currently a placeholder).

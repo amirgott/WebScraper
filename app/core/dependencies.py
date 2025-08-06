@@ -1,36 +1,53 @@
 from app.core.config import config
-from app.core.services import LLMService, ApifyScraperService, ScrapyScraperService, GoogleSheetsService, BaseScraperService
+from app.core.services import BaseLLMService, BaseScraperService, GoogleSheetsService
+from app.core.factory import ServiceFactory
 
-# Dependency to get a singleton LLMService instance.
-llm_service_instance = LLMService(api_key=config.GOOGLE_AI_STUDIO_KEY)
+# Service instances - initialized on first access
+_llm_service_instance = None
+_scraper_service_instance = None
+_google_sheets_service_instance = None
 
-def get_llm_service():
-    return llm_service_instance
+def get_llm_service() -> BaseLLMService:
+    """
+    Returns a singleton instance of the configured LLM service.
+    The actual implementation is determined by the LLM_SERVICE_TYPE config.
+    """
+    global _llm_service_instance
+    if _llm_service_instance is None:
+        _llm_service_instance = ServiceFactory.create_service(
+            service_type='llm',
+            implementation=config.LLM_SERVICE_TYPE,
+            api_key=config.GOOGLE_AI_STUDIO_KEY
+        )
+    return _llm_service_instance
 
-# Dependency to get a singleton ScraperService instance.
-scraper_service_instance = ScraperService(api_key=config.APIFY_API_KEY)
-
-# Dependency to get the appropriate ScraperService instance based on config.
-# This function will return an instance that adheres to BaseScraperService interface.
 def get_scraper_service() -> BaseScraperService:
-    if config.SCRAPER_TYPE == "apify":
-        # Ensure ApifyScraperService is initialized only once
-        if not hasattr(get_scraper_service, '_apify_instance'):
-            get_scraper_service._apify_instance = ApifyScraperService(api_key=config.APIFY_API_KEY)
-        return get_scraper_service._apify_instance
-    elif config.SCRAPER_TYPE == "scrapy":
-        # Ensure ScrapyScraperService is initialized only once
-        if not hasattr(get_scraper_service, '_scrapy_instance'):
-            get_scraper_service._scrapy_instance = ScrapyScraperService()
-        return get_scraper_service._scrapy_instance
-    else:
-        raise ValueError(f"Unknown SCRAPER_TYPE: {config.SCRAPER_TYPE}. Must be 'apify' or 'scrapy'.")
+    """
+    Returns a singleton instance of the configured scraper service.
+    The actual implementation is determined by the SCRAPER_SERVICE_TYPE config.
+    """
+    global _scraper_service_instance
+    if _scraper_service_instance is None:
+        kwargs = {}
+        # Add implementation-specific parameters
+        if config.SCRAPER_SERVICE_TYPE == 'apify':
+            kwargs['api_key'] = config.APIFY_API_KEY
 
-# Dependency to get a singleton GoogleSheetsService instance.
-google_sheets_service_instance = GoogleSheetsService(
-    service_account_path=config.GOOGLE_SERVICE_ACCOUNT_PATH,
-    sheet_id=config.GOOGLE_SHEET_ID
-)
+        _scraper_service_instance = ServiceFactory.create_service(
+            service_type='scraper',
+            implementation=config.SCRAPER_SERVICE_TYPE,
+            **kwargs
+        )
+    return _scraper_service_instance
 
 def get_google_sheets_service():
-    return google_sheets_service_instance
+    """
+    Returns a singleton instance of the GoogleSheetsService.
+    """
+    global _google_sheets_service_instance
+    if _google_sheets_service_instance is None:
+        _google_sheets_service_instance = GoogleSheetsService(
+            service_account_path=config.GOOGLE_SERVICE_ACCOUNT_PATH,
+            sheet_id=config.GOOGLE_SHEET_ID
+        )
+    return _google_sheets_service_instance
