@@ -25,6 +25,7 @@ def get_scraper_service() -> BaseScraperService:
     """
     Returns a singleton instance of the configured scraper service.
     The actual implementation is determined by the SCRAPER_SERVICE_TYPE config.
+    Supports 'apify' and 'scrapy' implementations.
     """
     global _scraper_service_instance
     if _scraper_service_instance is None:
@@ -32,6 +33,8 @@ def get_scraper_service() -> BaseScraperService:
         # Add implementation-specific parameters
         if config.SCRAPER_SERVICE_TYPE == 'apify':
             kwargs['api_key'] = config.APIFY_API_KEY
+        # For 'scrapy' implementation, no special parameters are needed
+        # but we ensure it's properly handled
 
         _scraper_service_instance = ServiceFactory.create_service(
             service_type='scraper',

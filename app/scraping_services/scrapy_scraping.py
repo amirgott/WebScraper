@@ -1,32 +1,68 @@
 from typing import Dict, Any
+from datetime import datetime
+import requests
+from bs4 import BeautifulSoup
 from app.core.services import BaseScraperService
 
 
-# --- Scrapy Scraper Implementation (Placeholder) ---
-class ScrapyScraperService(BaseScraperService): # Inherit from BaseScraperService
+class ScrapyScraperService(BaseScraperService):
     """
-    Placeholder service for a Scrapy-based scraper.
-    NOTE: Integrating a full Scrapy project into a FastAPI application
-    is complex and typically involves running Scrapy spiders as separate
-    processes or using a dedicated Scrapy API. This implementation
-    is a basic placeholder to demonstrate the interface.
+    Web scraper service implementation using BeautifulSoup.
+    Extracts all text content from a given URL.
+    (Still named ScrapyScraperService for compatibility)
     """
     def __init__(self, *args, **kwargs):
-        print("ScrapyScraperService initialized (placeholder).")
-        # In a real scenario, you might initialize Scrapy settings or
-        # a client to communicate with a ScrapyD server here.
-        pass
+        print("Web scraper initialized.")
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
     def scrape_url(self, url: str) -> str:
         """
-        Placeholder implementation for Scrapy scraping.
-        """
-        print(f"Scraping URL: {url} with Scrapy (placeholder)...")
-        # A real Scrapy integration would involve:
-        # 1. Defining a Scrapy spider to extract the desired data.
-        # 2. Running the spider (e.g., using CrawlerProcess or a subprocess call).
-        # 3. Capturing the output (e.g., to a JSON file or by sending items to a pipeline).
-        # 4. Parsing the Scrapy output into the required dictionary format.
+        Scrapes the given URL and extracts all text content.
 
-        # Simulate Scrapy output for demonstration
-        return f"This is placeholder content scraped by Scrapy from {url}. A real Scrapy spider would extract actual data."
+        Args:
+            url (str): URL to scrape
+
+        Returns:
+            str: All text content extracted from the URL
+        """
+        print(f"Scraping URL: {url}...")
+
+        try:
+            # Fetch the webpage
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()  # Raise an exception for bad status codes
+
+            # Parse the HTML
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Remove unwanted elements
+            for element in soup(['script', 'style', 'noscript', 'iframe', 'svg']):
+                element.decompose()
+
+            # Extract all text
+            text_content = soup.get_text(separator=' ', strip=True)
+
+            # Normalize whitespace
+            text_content = ' '.join(text_content.split())
+
+            if not text_content:
+                return "No content was extracted from the URL."
+
+            # Format result as required by the scraper interface
+            result = text_content
+
+            print(f"Successfully extracted {len(text_content)} characters from {url}")
+            return result
+
+        except requests.RequestException as e:
+            error_message = f"Error while scraping URL {url}: {str(e)}"
+            print(error_message)
+            return error_message
+        except Exception as e:
+            error_message = f"Unexpected error while scraping URL {url}: {str(e)}"
+            print(error_message)
+            return error_message

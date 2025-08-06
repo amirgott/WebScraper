@@ -65,7 +65,7 @@ class GoogleSheetsService:
 
     def write_data(self, url, data: Dict[str, Any]):
         """
-        Appends a new row to the Google Sheet.
+        Adds a new row to the Google Sheet, starting from column A.
         """
         print("Writing data to Google Sheet...")
         list_data = [
@@ -82,5 +82,7 @@ class GoogleSheetsService:
                        ""
                    ]
 
-        self.sheet.append_row(list_data)
-        print("Data successfully written.")
+        # Get the next available row and insert data there
+        next_row = len(self.sheet.get_all_values()) + 1
+        self.sheet.insert_row(list_data, next_row)
+        print(f"Data successfully written to row {next_row}.")
