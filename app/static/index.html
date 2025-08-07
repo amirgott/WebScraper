@@ -118,93 +118,211 @@
     </div>
 
     <script>
-        // Get references to the HTML elements
+        // Global state
+        let urlQueue = [];
+        let currentUrl = null;
+        let currentRowNumber = null;
+
+        // DOM elements
         const urlInput = document.getElementById('urlInput');
-        const scrapeButton = document.getElementById('scrapeButton');
-        const resultDisplay = document.getElementById('resultDisplay');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const confirmButton = document.getElementById('confirmButton'); // Reference to the confirm button
+        const scrapeBtn = document.getElementById('scrapeBtn');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const improveBtn = document.getElementById('improveBtn');
+        const resultText = document.getElementById('resultText');
+        const resultsDiv = document.getElementById('results');
+        const urlCount = document.getElementById('urlCount');
+        const urlQueue_el = document.getElementById('urlQueue');
+        const urlList = document.getElementById('urlList');
+        const loadingIndicator = document.getElementById('loadingIndicator');
 
-        let url; // Declare url in the shared scope
+        // Make sure to add event listeners and load URLs after the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM fully loaded");
 
-        // Add an event listener to the scrape button
-        scrapeButton.addEventListener('click', async () => {
-            url = urlInput.value.trim();
+            // Set up event listeners
+            scrapeBtn.addEventListener('click', scrapePage);
+            confirmBtn.addEventListener('click', confirmResults);
+            improveBtn.addEventListener('click', improveResults);
 
-            // Basic validation for the URL input
+            // Automatically load URLs when page loads
+            loadUrls();
+        });
+
+        // Functions
+        async function loadUrls() {
+            console.log("Automatically loading URLs");
+            try {
+                // Show loading indicator
+                loadingIndicator.style.display = 'block';
+
+                console.log("Fetching URLs from /api/input-urls");
+                const response = await fetch('/api/input-urls');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("Received data:", data);
+
+                urlQueue = data.urls || [];
+                updateUrlDisplay();
+
+                if (urlQueue.length > 0) {
+                    console.log(`Loaded ${urlQueue.length} URLs, loading first URL`);
+                    loadNextUrl();
+                } else {
+                    console.log("No URLs found in the sheet");
+                    alert('No URLs found in the input sheet. You can enter a URL manually.');
+                }
+            } catch (error) {
+                console.error('Error loading URLs:', error);
+                alert('Failed to load URLs from sheet: ' + error.message);
+            } finally {
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        function updateUrlDisplay() {
+            urlQueue_el.innerHTML = '';
+            urlCount.textContent = urlQueue.length;
+
+            urlQueue.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.textContent = item.url;
+                if (index === 0 && currentUrl === item.url) {
+                    li.classList.add('current-url');
+                }
+                urlQueue_el.appendChild(li);
+            });
+
+            if (urlQueue.length > 0) {
+                urlList.classList.remove('hidden');
+            } else {
+                urlList.classList.add('hidden');
+            }
+        }
+
+        function loadNextUrl() {
+            if (urlQueue.length > 0) {
+                const nextItem = urlQueue[0];
+                urlInput.value = nextItem.url;
+                currentUrl = nextItem.url;
+                currentRowNumber = nextItem.row;
+                updateUrlDisplay();
+            } else {
+                urlInput.value = '';
+                currentUrl = null;
+                currentRowNumber = null;
+                resultsDiv.classList.add('hidden');
+                alert('All URLs have been processed!');
+            }
+        }
+
+        async function scrapePage() {
+            const url = urlInput.value.trim();
             if (!url) {
-                resultDisplay.value = 'Please enter a URL to scrape.';
+                alert('Please enter a URL');
                 return;
             }
 
-            // Show loading message and spinner, disable button
-            resultDisplay.value = 'Scraping in progress... This may take a moment.';
-            loadingSpinner.style.display = 'block'; // Show spinner
-            scrapeButton.disabled = true; // Disable button to prevent multiple clicks
-            confirmButton.disabled = true; // Ensure "Confirm" stays disabled during scraping
-            confirmButton.classList.add('hidden'); // Hide the button while scraping
-
             try {
-                // Define the backend URL. If running locally, it's typically http://localhost:5000/scrape
-                const backendUrl = 'http://localhost:5000/scrape';
+                scrapeBtn.disabled = true;
+                scrapeBtn.textContent = 'Scraping...';
 
-                // Make a POST request to the backend with the URL
-                const response = await fetch(backendUrl, {
+                const response = await fetch('/api/scrape', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ url }), // Send data as JSON
+                    body: JSON.stringify({ url }),
                 });
 
-                const data = await response.json(); // Parse the JSON response from the backend
-
-                if (response.ok) {
-                    const resultData = data.result; // This is the object received from the backend
-
-                    // Format the object into readable text
-                    const formattedResult = Object.entries(resultData)
-                        .map(([key, value]) => `${key}: ${value || 'N/A'}`)
-                        .join('\n'); // Join lines with newlines
-
-                    resultDisplay.value = formattedResult || 'No content extracted or result is empty.';
-
-                    // Enable and show the confirm button
-                    confirmButton.disabled = false;
-                    confirmButton.classList.remove('hidden');
-                } else {
-                    resultDisplay.value = `Error: ${data.error || 'Unknown error occurred.'}`;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+
+                const data = await response.json();
+                resultText.textContent = JSON.stringify(data, null, 2);
+                resultsDiv.classList.remove('hidden');
+
+                // If this is a manually entered URL (not from queue)
+                if (url !== currentUrl) {
+                    currentUrl = url;
+                    currentRowNumber = null;
+                }
+
             } catch (error) {
-                console.error('Fetch error:', error);
-                resultDisplay.value = `Failed to connect to the backend or an unexpected error occurred: ${error.message}`;
+                console.error('Error:', error);
+                alert('Failed to scrape page: ' + error.message);
             } finally {
-                // Always hide the spinner and re-enable the scrape button, regardless of success or failure
-                loadingSpinner.style.display = 'none';
-                scrapeButton.disabled = false;
+                scrapeBtn.disabled = false;
+                scrapeBtn.textContent = 'Scrape Page';
             }
-        });
+        }
 
-        // Add an event listener to the confirm button
-        confirmButton.addEventListener('click', async () => {
+        async function confirmResults() {
+            if (!currentUrl) {
+                alert('No URL to confirm');
+                return;
+            }
+
             try {
-                const confirmUrl = `http://localhost:5000/confirm?url=${url}`;
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Confirming...';
 
-                const response = await fetch(confirmUrl, {
-                    method: 'POST'
+                // Prepare request body with the URL and optional row number
+                const requestBody = {
+                    url: currentUrl
+                };
+
+                if (currentRowNumber) {
+                    requestBody.row_number = currentRowNumber;
+                }
+
+                const response = await fetch('/api/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
                 });
 
-                if (response.ok) {
-                    alert('Confirmation received successfully!');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // If URL was from queue, remove it and load next URL
+                if (urlQueue.length > 0 && urlQueue[0].url === currentUrl) {
+                    urlQueue.shift();
+                    updateUrlDisplay();
+                    resultsDiv.classList.add('hidden');
+                    resultText.textContent = '';
+                    loadNextUrl();
                 } else {
-                    const errorData = await response.json();
-                    alert(`Confirmation failed: ${errorData.detail || 'Unknown error'}`);
+                    // Manual URL processing completed
+                    alert('URL processed successfully!');
+                    resultsDiv.classList.add('hidden');
+                    resultText.textContent = '';
+                    urlInput.value = '';
+                    currentUrl = null;
+                    currentRowNumber = null;
                 }
             } catch (error) {
-                console.error('Confirm error:', error);
-                alert('An error occurred when confirming.');
+                console.error('Error:', error);
+                alert('Failed to confirm results: ' + error.message);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirm';
             }
-        });
+        }
+
+        async function improveResults() {
+            // This is a placeholder for the improve functionality
+            alert('Improve functionality not implemented yet.');
+        }
     </script>
 </body>
 </html>
