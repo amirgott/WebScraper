@@ -1,13 +1,21 @@
 import json
+import base64
 from datetime import datetime
+from io import BytesIO
+from PIL import Image
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 
-from app.core.dependencies import get_llm_service, get_scraper_service, get_google_sheets_service, get_scraping_service
+from app.core.dependencies import (
+    get_llm_service, get_scraper_service, get_google_sheets_service, 
+    get_scraping_service, get_workflow_orchestrator, get_ocr_service
+)
 from app.core.services import BaseLLMService, BaseScraperService, GoogleSheetsService, ScrapingService
+from app.api.models import EventRecord, WorkflowResult
+from app.core.url_utils import is_url_only_text
 
 router = APIRouter()
 
@@ -248,6 +256,107 @@ async def webhook_trigger(request: Request):
             content={"status": "error", "message": str(e)},
             status_code=500
         )
+
+@router.post("/run_scrape")
+async def run_scrape_endpoint(
+    text_input: Optional[str] = Form(None),
+    image_data: Optional[str] = Form(None),
+    pdf_file: Optional[UploadFile] = File(None),
+    workflow_orchestrator = Depends(get_workflow_orchestrator)
+):
+    """
+    Main endpoint that handles all three input types and orchestrates workflows.
+    """
+    try:
+        # Initialize event record
+        event_record = EventRecord()
+        all_discovered_urls = []
+        workflow_results = []
+
+        # Process text input
+        if text_input and text_input.strip():
+            # Check if text contains only a URL
+            url_only = is_url_only_text(text_input)
+            if url_only:
+                # Use URL workflow for URL-only text
+                result = await workflow_orchestrator.process_url_workflow(url_only, event_record, depth=0)
+                workflow_results.append(result)
+                if result.discovered_urls:
+                    all_discovered_urls.extend(result.discovered_urls)
+            else:
+                # Use text workflow for regular text content
+                result = await workflow_orchestrator.process_text_workflow(text_input.strip(), event_record, depth=0)
+                workflow_results.append(result)
+                if result.discovered_urls:
+                    all_discovered_urls.extend(result.discovered_urls)
+
+        # Process image input
+        if image_data:
+            result = await workflow_orchestrator.process_image_workflow(image_data, event_record)
+            workflow_results.append(result)
+
+        # Process PDF input
+        if pdf_file:
+            pdf_content = await pdf_file.read()
+            result = await workflow_orchestrator.process_pdf_workflow(pdf_content, event_record)
+            workflow_results.append(result)
+
+        # Process discovered URLs (depth 1 only)
+        for url in all_discovered_urls:
+            try:
+                result = await workflow_orchestrator.process_url_workflow(url, event_record, depth=1)
+                workflow_results.append(result)
+            except Exception as e:
+                print(f"Error processing discovered URL {url}: {e}")
+
+        # Store results for potential confirmation
+        request_id = f"{datetime.now().timestamp()}"
+        persistent_data[request_id] = {
+            'event_record': event_record,
+            'workflow_results': workflow_results
+        }
+
+        return JSONResponse(content={
+            'request_id': request_id,
+            'event_record': event_record.dict(),
+            'workflow_results': [result.dict() for result in workflow_results],
+            'summary': {
+                'total_workflows': len(workflow_results),
+                'discovered_urls_count': len(all_discovered_urls)
+            }
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/write_to_sheet")
+async def write_to_sheet(
+    request_data: dict,
+    gsheets: GoogleSheetsService = Depends(get_google_sheets_service)
+):
+    """
+    Write the processed event record to Google Sheets.
+    """
+    try:
+        request_id = request_data.get('request_id')
+
+        if not request_id or request_id not in persistent_data:
+            raise HTTPException(status_code=404, detail="Request ID not found")
+
+        event_record = persistent_data[request_id]['event_record']
+
+        # Write to Google Sheets
+        success = gsheets.write_event_record(event_record)
+
+        if success:
+            # Clean up persistent data
+            del persistent_data[request_id]
+            return JSONResponse(content={"message": "Successfully written to Google Sheets"})
+        else:
+            raise HTTPException(status_code=500, detail="Failed to write to Google Sheets")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/improve")
 async def improve_data(

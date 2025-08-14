@@ -68,3 +68,38 @@ def get_scraping_service() -> ScrapingService:
             llm=get_llm_service()
         )
     return _scraping_service_instance
+
+# Additional service instances for new functionality
+_ocr_service_instance = None
+_workflow_orchestrator_instance = None
+
+def get_ocr_service():
+    """
+    Returns a singleton instance of the OCR service.
+    """
+    global _ocr_service_instance
+    if _ocr_service_instance is None:
+        try:
+            from app.core.ocr_service import OCRService
+            _ocr_service_instance = OCRService()
+        except ImportError as e:
+            print(f"Warning: OCR service not available: {e}")
+            _ocr_service_instance = None
+    return _ocr_service_instance
+
+def get_workflow_orchestrator():
+    """
+    Returns a singleton instance of the WorkflowOrchestrator.
+    """
+    global _workflow_orchestrator_instance
+    if _workflow_orchestrator_instance is None:
+        try:
+            from app.core.workflow_orchestrator import WorkflowOrchestrator
+            llm_service = get_llm_service()
+            scraper_service = get_scraper_service()
+            ocr_service = get_ocr_service()
+            _workflow_orchestrator_instance = WorkflowOrchestrator(llm_service, scraper_service, ocr_service)
+        except ImportError as e:
+            print(f"Warning: Workflow orchestrator not available: {e}")
+            _workflow_orchestrator_instance = None
+    return _workflow_orchestrator_instance

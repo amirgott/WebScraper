@@ -15,7 +15,7 @@ def create_app() -> FastAPI:
     """
     Creates and configures the FastAPI application.
     """
-    app = FastAPI(title="URL Processing API")
+    app = FastAPI(title="Event Data Aggregator for 17 SDGs Portal")
 
     # Configure CORS middleware
     # In a production environment, you should restrict origins to your frontend URL
@@ -33,6 +33,11 @@ def create_app() -> FastAPI:
 
     # Include the API router
     app.include_router(api_router, prefix="/api")
+
+    @app.get("/")
+    async def serve_index():
+        """Serve the main HTML interface"""
+        return FileResponse("app/static/index.html")
 
     return app
 

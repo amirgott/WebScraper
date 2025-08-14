@@ -194,3 +194,65 @@ class GoogleSheetsService:
         except Exception as e:
             print(f"Error writing to output sheet: {e}")
             return False
+
+    def write_event_record(self, event_record) -> bool:
+            """
+            Write an EventRecord to the output sheet with proper Hebrew column mapping.
+            """
+            try:
+                from app.api.models import EventRecord
+
+                # Define the column mapping based on the Hebrew schema
+                column_mapping = {
+                    'תאריך': 'A',
+                    'משעה': 'B', 
+                    'עד_שעה': 'C',
+                    'שם_האירוע': 'D',
+                    'תעשיה': 'E',
+                    'תעשיה_2': 'F',
+                    'אירועי_פיזי_אונליין': 'G',
+                    'תוכן': 'H',
+                    'חברה_מארחת': 'I',
+                    'חברות_נוספות': 'J',
+                    'מרצה_מארח': 'K',
+                    'מרצים_נוספים': 'L',
+                    'לינק_להרשמה': 'M',
+                    'לינקים_נוספים': 'N',
+                    'IMAGE': 'O',
+                    'עלות': 'P',
+                    'אי_מייל_למשתתפים': 'Q',
+                    'יום_בשבוע': 'R',
+                    'IN_CALENDAR': 'S',
+                    'Error': 'T'
+                }
+
+                # Get the next empty row
+                next_row = len(self.output_sheet.get_all_values()) + 1
+
+                # Prepare the row data
+                row_data = []
+                event_dict = event_record.dict() if hasattr(event_record, 'dict') else event_record
+
+                for field_name in column_mapping.keys():
+                    value = event_dict.get(field_name, '')
+
+                    # Handle list fields
+                    if isinstance(value, list):
+                        value = ', '.join(str(v) for v in value if v)
+
+                    # Handle None values
+                    if value is None:
+                        value = ''
+
+                    row_data.append(str(value))
+
+                # Write the row
+                range_name = f"A{next_row}:T{next_row}"
+                self.output_sheet.update(range_name, [row_data])
+
+                print(f"Successfully wrote event record to row {next_row}")
+                return True
+
+            except Exception as e:
+                print(f"Error writing event record: {str(e)}")
+                return False
